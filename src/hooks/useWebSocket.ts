@@ -1,5 +1,3 @@
-// src/hooks/useWebSocket.ts
-// Hook para gerenciar conexão WebSocket com reconexão automática
 import { useEffect, useRef } from 'react';
 
 export const useWebSocket = (url: string, onMessage: (msg: MessageEvent) => void) => {

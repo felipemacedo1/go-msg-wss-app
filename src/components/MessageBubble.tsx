@@ -1,5 +1,3 @@
-// src/components/MessageBubble.tsx
-// Componente para exibir uma mensagem no chat
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Message } from '../context/ChatContext';
@@ -12,9 +10,9 @@ type Props = {
 export default function MessageBubble({ message, isOwn }: Props) {
   return (
     <View style={[styles.bubble, isOwn ? styles.own : styles.other]}>
-      <Text style={styles.user}>{message.user}</Text>
-      <Text>{message.content}</Text>
-      <Text style={styles.time}>{new Date(message.createdAt).toLocaleTimeString()}</Text>
+      <Text style={styles.user}>{message.author_name}</Text>
+      <Text>{message.message}</Text>
+      <Text style={styles.time}>{new Date(message.created_at).toLocaleTimeString()}</Text>
     </View>
   );
 }

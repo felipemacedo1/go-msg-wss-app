@@ -1,5 +1,3 @@
-// src/context/AuthContext.tsx
-// Contexto global para autenticação do usuário
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -28,7 +26,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   React.useEffect(() => {
-    // Carrega o token salvo ao iniciar
     AsyncStorage.getItem('jwt').then((savedToken) => {
       if (savedToken) setTokenState(savedToken);
     });

@@ -1,17 +1,14 @@
-// src/context/ChatContext.tsx
-// Contexto global para mensagens do chat
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 
 export interface Message {
   id: string;
-  user: string;
-  content: string;
-  createdAt: string;
-  reactions?: { [emoji: string]: number };
-  // Permite status extra para renderização
-  answered?: boolean;
-  author_name?: string;
-  message?: string;
+  room_id: string;
+  message: string;
+  reaction_count: number;
+  answered: boolean;
+  author_id: string;
+  author_name: string;
+  created_at: string;
 }
 
 type SetMessagesType = React.Dispatch<React.SetStateAction<Message[]>>;

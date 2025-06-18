@@ -1,30 +1,45 @@
-// src/api/messages.ts
-// Funções para manipulação de mensagens
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8080';
+const API_URL = 'http://localhost:8080/api';
 
-export const getMessages = async (token: string, roomId: string) => {
+export const getMessages = async (roomId: string, token?: string) => {
   const res = await axios.get(`${API_URL}/rooms/${roomId}/messages`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   return res.data;
 };
 
-export const sendMessage = async (token: string, roomId: string, content: string) => {
+export const sendMessage = async (roomId: string, message: string, token?: string) => {
   const res = await axios.post(
     `${API_URL}/rooms/${roomId}/messages`,
-    { content },
-    { headers: { Authorization: `Bearer ${token}` } }
+    { message },
+    { headers: token ? { Authorization: `Bearer ${token}` } : {} }
   );
   return res.data;
 };
 
-export const reactMessage = async (token: string, messageId: string, reaction: string) => {
-  const res = await axios.post(
-    `${API_URL}/messages/${messageId}/react`,
-    { reaction },
-    { headers: { Authorization: `Bearer ${token}` } }
+export const reactMessage = async (roomId: string, messageId: string, token?: string) => {
+  const res = await axios.patch(
+    `${API_URL}/rooms/${roomId}/messages/${messageId}/react`,
+    {},
+    { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+  );
+  return res.data;
+};
+
+export const unreactMessage = async (roomId: string, messageId: string, token?: string) => {
+  const res = await axios.delete(
+    `${API_URL}/rooms/${roomId}/messages/${messageId}/react`,
+    { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+  );
+  return res.data;
+};
+
+export const answerMessage = async (roomId: string, messageId: string, token?: string) => {
+  const res = await axios.patch(
+    `${API_URL}/rooms/${roomId}/messages/${messageId}/answer`,
+    {},
+    { headers: token ? { Authorization: `Bearer ${token}` } : {} }
   );
   return res.data;
 };

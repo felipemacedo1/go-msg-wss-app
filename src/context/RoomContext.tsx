@@ -1,5 +1,3 @@
-// src/context/RoomContext.tsx
-// Contexto global para lista de salas
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 
 export interface Room {

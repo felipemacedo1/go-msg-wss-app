@@ -1,5 +1,3 @@
-// src/components/RoomCard.tsx
-// Componente para exibir uma sala na lista
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, View } from 'react-native';
 import { Room } from '../context/RoomContext';

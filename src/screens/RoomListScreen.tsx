@@ -1,23 +1,18 @@
-// src/screens/RoomListScreen.tsx
-// Tela principal com lista de salas e botão para criar nova sala
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, Button, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
-import { useAuth } from '../context/AuthContext';
 import { useRooms } from '../context/RoomContext';
 import { getRooms, createRoom } from '../api/rooms';
 
 export default function RoomListScreen({ navigation }: any) {
-  const { token } = useAuth();
   const { rooms, setRooms } = useRooms();
   const [newTheme, setNewTheme] = useState('');
   const [loading, setLoading] = useState(false);
 
   const fetchRooms = async () => {
-    if (!token) return;
     setLoading(true);
     try {
-      const data = await getRooms(token);
-      setRooms(data);
+      const data = await getRooms();
+      setRooms(data as import('../context/RoomContext').Room[]);
     } catch (e) {
       alert('Erro ao buscar salas');
     } finally {
@@ -27,12 +22,12 @@ export default function RoomListScreen({ navigation }: any) {
 
   useEffect(() => {
     fetchRooms();
-  }, [token]);
+  }, []);
 
   const handleCreateRoom = async () => {
     if (!newTheme.trim()) return;
     try {
-      await createRoom(token!, newTheme);
+      await createRoom(newTheme);
       setNewTheme('');
       fetchRooms();
     } catch (e) {

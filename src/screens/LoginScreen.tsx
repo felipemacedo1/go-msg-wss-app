@@ -1,5 +1,3 @@
-// src/screens/LoginScreen.tsx
-// Tela de login simples (nickname ou JWT mockado)
 import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
 import { useAuth } from '../context/AuthContext';
