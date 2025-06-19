@@ -17,10 +17,12 @@ Aplicativo mobile de chat anônimo em tempo real, desenvolvido em React Native +
 src/
 ├── api/           # Funções REST para rooms e messages
 ├── components/    # Componentes reutilizáveis (RoomCard, MessageBubble)
+├── config/        # Configurações de ambiente (URLs da API e WebSocket)
 ├── context/       # Contextos globais (Auth, Room, Chat)
 ├── hooks/         # Hooks customizados (useWebSocket)
 ├── navigation/    # Navegação principal
 ├── screens/       # Telas (Login, RoomList, Chat)
+.env               # Variáveis de ambiente (URLs da API e WebSocket)
 ```
 
 ## Fluxo do Usuário
@@ -55,19 +57,24 @@ src/
 
 ## Como rodar
 
-1. Instale as dependências:
+1. Configure as variáveis de ambiente:
+   - Copie o arquivo `.env` e ajuste os IPs conforme necessário
+   - Para desenvolvimento local, use `localhost`
+   - Para testes em dispositivo físico, use o IP da máquina (ex: `192.168.10.84`)
+
+2. Instale as dependências:
    ```sh
    npm install
    # ou
    yarn
    ```
-2. Inicie o app:
+3. Inicie o app:
    ```sh
    npm start
    # ou
    yarn start
    ```
-3. Certifique-se que o backend Go está rodando em `http://localhost:8080`.
+4. Certifique-se que o backend Go está rodando na URL configurada no `.env`.
 
 ## Observações
 - O app funciona como guest (sem autenticação obrigatória).

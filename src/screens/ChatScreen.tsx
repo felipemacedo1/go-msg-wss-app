@@ -6,17 +6,27 @@ import { useChat, Message } from '../context/ChatContext';
 import { getMessages, sendMessage, reactMessage, unreactMessage, answerMessage } from '../api/messages';
 import { useWebSocket } from '../hooks/useWebSocket';
 import MessageBubble from '../components/MessageBubble';
+import { useAuth } from '../context/AuthContext';
+import { config } from '../config/env';
 
 export default function ChatScreen({ route }: any) {
   const { room } = route.params;
   const { messages, setMessages } = useChat();
+  const { nickname } = useAuth();
   const [input, setInput] = useState('');
   const flatListRef = useRef<FlatList<Message>>(null);
-  const wsUrl = `ws://localhost:8080/subscribe/${room.id}`;
+  const wsUrl = config.getWebSocketUrl(room.id);
+
+  console.log('ChatScreen render - messages.length:', messages.length);
 
   // Carrega mensagens ao montar
   useEffect(() => {
-    getMessages(room.id).then((msgs) => setMessages(msgs as Message[]));
+    getMessages(room.id).then((msgs) => {
+      console.log('Mensagens carregadas:', msgs);
+      const messages = msgs as Message[];
+      setMessages(messages);
+      console.log('setMessages chamado com:', messages.length, 'mensagens');
+    });
   }, [room.id, setMessages]);
 
   // WebSocket para eventos
@@ -24,7 +34,11 @@ export default function ChatScreen({ route }: any) {
     try {
       const event = JSON.parse(msg.data);
       if (event.kind === 'message_created') {
-        setMessages((prev) => ([...prev, event.value]));
+        setMessages((prev) => {
+          // Evita duplicatas
+          if (prev.some((m) => m.id === event.value.id)) return prev;
+          return [...prev, event.value];
+        });
       } else if (event.kind === 'message_reaction_increased') {
         setMessages((prev) => prev.map((m) => m.id === event.value.id ? { ...m, reaction_count: event.value.count } : m));
       } else if (event.kind === 'message_reaction_decreased') {
@@ -39,13 +53,19 @@ export default function ChatScreen({ route }: any) {
 
   // Scroll automático ao receber novas mensagens
   useEffect(() => {
-    flatListRef.current?.scrollToEnd({ animated: true });
+    console.log('useEffect messages changed, total:', messages.length);
+    if (messages.length > 0) {
+      flatListRef.current?.scrollToEnd({ animated: true });
+      console.log('Mensagens renderizadas:', messages);
+    }
   }, [messages]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
     await sendMessage(room.id, input);
     setInput('');
+    // Opcional: recarregar mensagens após envio (caso o WS não retorne imediatamente)
+    // getMessages(room.id).then((msgs) => setMessages(msgs as Message[]));
   };
 
   const handleLike = async (message: Message) => {
@@ -68,23 +88,26 @@ export default function ChatScreen({ route }: any) {
           ref={flatListRef}
           data={messages}
           keyExtractor={item => item.id}
-          renderItem={({ item }) => (
-            <View style={{ marginVertical: 2 }}>
-              <MessageBubble message={item} isOwn={false} />
-              <View style={styles.reactionsRow}>
-                <TouchableOpacity onPress={() => handleLike(item)} style={styles.likeBtn}>
-                  <Text>👍 {item.reaction_count}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleUnlike(item)} style={styles.likeBtn}>
-                  <Text>👎</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleAnswer(item)} style={styles.likeBtn}>
-                  <Text>Responder</Text>
-                </TouchableOpacity>
-                {item.answered && <Text style={styles.answered}>Respondida</Text>}
+          renderItem={({ item }) => {
+            console.log('Renderizando item:', item.id, item.message);
+            return (
+              <View style={{ marginVertical: 2 }}>
+                <MessageBubble message={item} isOwn={!!nickname && item.author_name === nickname} />
+                <View style={styles.reactionsRow}>
+                  <TouchableOpacity onPress={() => handleLike(item)} style={styles.likeBtn}>
+                    <Text>👍 {item.reaction_count}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleUnlike(item)} style={styles.likeBtn}>
+                    <Text>👎</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleAnswer(item)} style={styles.likeBtn}>
+                    <Text>Responder</Text>
+                  </TouchableOpacity>
+                  {item.answered && <Text style={styles.answered}>Respondida</Text>}
+                </View>
               </View>
-            </View>
-          )}
+            );
+          }}
           contentContainerStyle={{ paddingBottom: 16 }}
         />
         <View style={styles.inputRow}>

@@ -1,6 +1,8 @@
 import axios from 'axios';
+import { config } from '../config/env';
 
-const API_URL = 'http://localhost:8080/api';
+// URL da API centralizada no arquivo de configuração
+const API_URL = config.API_URL;
 
 export const getRooms = async (token?: string) => {
   const res = await axios.get(`${API_URL}/rooms`, {
@@ -13,7 +15,7 @@ export const createRoom = async (theme: string, token?: string) => {
   const res = await axios.post(
     `${API_URL}/rooms`,
     { theme },
-    { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+    // { headers: token ? { Authorization: `Bearer ${token}` } : {} }
   );
   return res.data;
 };

@@ -12,7 +12,7 @@ export default function LoginScreen({ navigation }: any) {
     setLoading(true);
     try {
       const { token } = await login(nickname);
-      await setToken(token);
+      await setToken(token, nickname); // Passa nickname para o contexto
       navigation.replace('RoomList');
     } catch (e) {
       alert('Erro ao logar');

@@ -1,6 +1,7 @@
 import axios from 'axios';
+import { config } from '../config/env';
 
-const API_URL = 'http://localhost:8080/api';
+const API_URL = config.API_URL;
 
 export const getMessages = async (roomId: string, token?: string) => {
   const res = await axios.get(`${API_URL}/rooms/${roomId}/messages`, {
