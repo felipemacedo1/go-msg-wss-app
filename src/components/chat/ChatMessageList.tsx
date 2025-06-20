@@ -1,6 +1,6 @@
 import React, { RefObject } from 'react';
 import { FlatList, View } from 'react-native';
-import { Message } from '../context/ChatContext';
+import { Message } from '../../context/ChatContext';
 import MessageBubble from './MessageBubble';
 import MessageReactions from './MessageReactions';
 import DateSeparator from './DateSeparator';

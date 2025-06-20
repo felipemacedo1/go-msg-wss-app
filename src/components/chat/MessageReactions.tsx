@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet, ViewStyle } from 'react-native';
-import { Message } from '../context/ChatContext';
+import { Message } from '../../context/ChatContext';
 
 interface MessageReactionsProps {
   message: Message;

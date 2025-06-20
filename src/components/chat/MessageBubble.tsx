@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Message } from '../context/ChatContext';
+import { Message } from '../../context/ChatContext';
 
 type Props = {
   message: Message;
