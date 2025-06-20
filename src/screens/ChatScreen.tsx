@@ -1,7 +1,23 @@
 // src/screens/ChatScreen.tsx
 // Tela de chat: conecta ao WebSocket e imprime mensagens recebidas
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, Button, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  FlatList, 
+  TextInput, 
+  TouchableOpacity, 
+  KeyboardAvoidingView, 
+  Platform,
+  StatusBar,
+  Animated,
+  Dimensions,
+  Alert,
+  Keyboard,
+  EmitterSubscription
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChat, Message } from '../context/ChatContext';
 import { getMessages, sendMessage, reactMessage, unreactMessage, answerMessage } from '../api/messages';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -9,15 +25,145 @@ import MessageBubble from '../components/MessageBubble';
 import { useAuth } from '../context/AuthContext';
 import { config } from '../config/env';
 
-export default function ChatScreen({ route }: any) {
+const { width } = Dimensions.get('window');
+
+export default function ChatScreen({ route, navigation }: any) {
   const { room } = route.params;
   const { messages, setMessages } = useChat();
   const { nickname } = useAuth();
   const [input, setInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [onlineUsers] = useState(Math.floor(Math.random() * 15) + 3); // Mock
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [inputHeight, setInputHeight] = useState(48); // Altura inicial do input
+  const [animationInProgress, setAnimationInProgress] = useState(false);
   const flatListRef = useRef<FlatList<Message>>(null);
+  const inputRef = useRef<TextInput>(null);
   const wsUrl = config.getWebSocketUrl(room.id);
+  const keyboardAnimation = useRef(new Animated.Value(0)).current;
+  const insets = useSafeAreaInsets();
 
-  console.log('ChatScreen render - messages.length:', messages.length);
+  // Função utilitária para aplicar as transformações de maneira consistente
+  const getTranslateY = (kbHeight: number, offset = 0) => [{
+    translateY: keyboardAnimation.interpolate({
+      inputRange: [0, Math.max(1, kbHeight)],
+      outputRange: [0, -Math.max(0, kbHeight - offset)],
+      extrapolate: 'clamp'
+    })
+  }];
+
+  // Função para garantir que o input mantenha o foco corretamente
+  const focusInputWithPosition = () => {
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    }, 50);
+  };
+
+  // Função auxiliar para iniciar animações do teclado
+  const startKeyboardAnimation = (toValue: number, duration: number) => {
+    // Evitar iniciar nova animação se já estiver animando
+    if (animationInProgress) return;
+    
+    setAnimationInProgress(true);
+    
+    Animated.timing(keyboardAnimation, {
+      toValue,
+      duration,
+      useNativeDriver: true,
+      // Adicionar easing para uma animação mais natural
+    }).start(({ finished }) => {
+      if (finished) {
+        setAnimationInProgress(false);
+        if (toValue > 0) {
+          // Quando o teclado abre, garantimos o foco no input
+          focusInputWithPosition();
+        }
+      }
+    });
+  };
+
+  // Listeners do teclado para comportamento similar ao WhatsApp
+  useEffect(() => {
+    let keyboardWillShowListener: EmitterSubscription;
+    let keyboardWillHideListener: EmitterSubscription;
+    let keyboardDidShowListener: EmitterSubscription;
+    let keyboardDidHideListener: EmitterSubscription;
+
+    if (Platform.OS === 'ios') {
+      keyboardWillShowListener = Keyboard.addListener('keyboardWillShow', (event) => {
+        const { height } = event.endCoordinates;
+        const duration = event.duration || 250;
+        
+        // Garantir valor positivo e válido
+        const finalHeight = Math.max(0, height);
+        setKeyboardHeight(finalHeight);
+        setIsKeyboardVisible(true);
+        
+        // Usar a função auxiliar para animação
+        startKeyboardAnimation(finalHeight, duration);
+        
+        // Scroll para o final quando o teclado aparecer
+        setTimeout(() => {
+          if (flatListRef.current && messages.length > 0) {
+            flatListRef.current.scrollToEnd({ animated: true });
+          }
+        }, Math.min(duration / 2, 100));
+      });
+
+      keyboardWillHideListener = Keyboard.addListener('keyboardWillHide', (event) => {
+        const duration = event.duration || 250;
+        setIsKeyboardVisible(false);
+        
+        // Usar a função auxiliar para animação
+        startKeyboardAnimation(0, duration);
+        setTimeout(() => {
+          setKeyboardHeight(0);
+        }, duration);
+      });
+    } else {
+      // Android usa keyboardDidShow/Hide
+      keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', (event) => {
+        const { height } = event.endCoordinates;
+        // No Android, ajustamos a altura considerando a inset bottom
+        // Usar valor maior entre insets.bottom e 0 para evitar valores negativos
+        const safeAreaOffset = Math.max(0, insets.bottom);
+        const adjustedHeight = Math.max(0, height - safeAreaOffset);
+        
+        setKeyboardHeight(adjustedHeight);
+        setIsKeyboardVisible(true);
+        
+        // Usar a função auxiliar para animação
+        startKeyboardAnimation(adjustedHeight, 200);
+        
+        // Scroll para o final quando o teclado aparecer
+        setTimeout(() => {
+          if (flatListRef.current && messages.length > 0) {
+            flatListRef.current.scrollToEnd({ animated: true });
+          }
+        }, 100);
+      });
+
+      keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
+        setIsKeyboardVisible(false);
+        
+        // Usar a função auxiliar para animação
+        startKeyboardAnimation(0, 200);
+        setTimeout(() => {
+          setKeyboardHeight(0);
+        }, 200);
+      });
+    }
+
+    return () => {
+      keyboardWillShowListener?.remove();
+      keyboardWillHideListener?.remove();
+      keyboardDidShowListener?.remove();
+      keyboardDidHideListener?.remove();
+    };
+  }, []);
 
   // Carrega mensagens ao montar
   useEffect(() => {
@@ -62,10 +208,31 @@ export default function ChatScreen({ route }: any) {
 
   const handleSend = async () => {
     if (!input.trim()) return;
-    await sendMessage(room.id, input);
-    setInput('');
-    // Opcional: recarregar mensagens após envio (caso o WS não retorne imediatamente)
-    // getMessages(room.id).then((msgs) => setMessages(msgs as Message[]));
+    
+    setIsTyping(true);
+    // Usando um Animated.Value separado para a animação de envio
+    const sendAnimation = new Animated.Value(0);
+    Animated.sequence([
+      Animated.timing(sendAnimation, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(sendAnimation, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      })
+    ]).start();
+
+    try {
+      await sendMessage(room.id, input);
+      setInput('');
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível enviar a mensagem. Tente novamente.');
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   const handleLike = async (message: Message) => {
@@ -81,57 +248,456 @@ export default function ChatScreen({ route }: any) {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={styles.container}>
-        <Text style={styles.title}>Sala: {room.theme}</Text>
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={item => item.id}
-          renderItem={({ item }) => {
-            console.log('Renderizando item:', item.id, item.message);
+    <>
+      <StatusBar barStyle="light-content" backgroundColor="#2c3e50" />
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        {/* Header Moderno */}
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backIcon}>←</Text>
+          </TouchableOpacity>
+          
+          <View style={styles.headerInfo}>
+            <Text style={styles.roomTitle} numberOfLines={1}>
+              {room.theme}
+            </Text>
+            <Text style={styles.onlineStatus}>
+              {onlineUsers} pessoas online
+            </Text>
+          </View>
+          
+          <TouchableOpacity style={styles.menuButton}>
+            <Text style={styles.menuIcon}>⋯</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Lista de Mensagens com margem bottom dinâmica */}
+        <Animated.View style={[
+          styles.messagesWrapper,
+          {
+            transform: getTranslateY(keyboardHeight, 80)
+          }
+        ]}>
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            keyExtractor={item => item.id}
+            renderItem={({ item, index }) => {
+            const isOwnMessage = !!nickname && item.author_name === nickname;
+            const showDateSeparator = index === 0 || 
+              new Date(item.created_at).toDateString() !== 
+              new Date(messages[index - 1].created_at).toDateString();
+
             return (
-              <View style={{ marginVertical: 2 }}>
-                <MessageBubble message={item} isOwn={!!nickname && item.author_name === nickname} />
-                <View style={styles.reactionsRow}>
-                  <TouchableOpacity onPress={() => handleLike(item)} style={styles.likeBtn}>
-                    <Text>👍 {item.reaction_count}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleUnlike(item)} style={styles.likeBtn}>
-                    <Text>👎</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleAnswer(item)} style={styles.likeBtn}>
-                    <Text>Responder</Text>
-                  </TouchableOpacity>
-                  {item.answered && <Text style={styles.answered}>Respondida</Text>}
+              <View>
+                {showDateSeparator && (
+                  <View style={styles.dateSeparator}>
+                    <Text style={styles.dateText}>
+                      {new Date(item.created_at).toLocaleDateString('pt-BR', {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long'
+                      })}
+                    </Text>
+                  </View>
+                )}
+                
+                <View style={[
+                  styles.messageContainer,
+                  isOwnMessage && styles.ownMessageContainer
+                ]}>
+                  <MessageBubble message={item} isOwn={isOwnMessage} />
+                  
+                  {/* Reações Melhoradas */}
+                  <View style={[
+                    styles.reactionsContainer,
+                    isOwnMessage && styles.ownReactionsContainer
+                  ]}>
+                    <TouchableOpacity 
+                      onPress={() => handleLike(item)} 
+                      style={[styles.reactionButton, styles.likeButton]}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.reactionIcon}>👍</Text>
+                      <Text style={styles.reactionCount}>{item.reaction_count}</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      onPress={() => handleAnswer(item)} 
+                      style={[styles.reactionButton, styles.replyButton]}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.reactionIcon}>�</Text>
+                    </TouchableOpacity>
+                    
+                    {item.answered && (
+                      <View style={styles.answeredBadge}>
+                        <Text style={styles.answeredText}>✓ Respondida</Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
               </View>
             );
           }}
-          contentContainerStyle={{ paddingBottom: 16 }}
+          contentContainerStyle={styles.messagesContainer}
+          showsVerticalScrollIndicator={false}
+          onContentSizeChange={() => {
+            if (messages.length > 0) {
+              flatListRef.current?.scrollToEnd({ animated: true });
+            }
+          }}
+          // Scroll automático quando o teclado estiver visível
+          onLayout={() => {
+            if (isKeyboardVisible && messages.length > 0) {
+              setTimeout(() => {
+                flatListRef.current?.scrollToEnd({ animated: true });
+              }, 100);
+            }
+          }}
         />
-        <View style={styles.inputRow}>
-          <TextInput
-            style={styles.input}
-            value={input}
-            onChangeText={setInput}
-            placeholder="Digite sua mensagem..."
-            onSubmitEditing={handleSend}
-            returnKeyType="send"
-          />
-          <Button title="Enviar" onPress={handleSend} disabled={!input.trim()} />
-        </View>
+        </Animated.View>
+
+        {/* Indicador de digitação */}
+        {isTyping && (
+          <Animated.View style={[
+            styles.typingIndicator,
+            {
+              transform: getTranslateY(keyboardHeight, 0)
+            }
+          ]}>
+            <Text style={styles.typingText}>Enviando mensagem...</Text>
+          </Animated.View>
+        )}
+
+        {/* Input Fixo na parte inferior */}
+        <Animated.View style={[
+          styles.inputContainer,
+          { 
+            paddingBottom: insets.bottom, // Padding em vez de position: bottom para safe area
+            transform: getTranslateY(keyboardHeight, 0)
+          }
+        ]}>
+          <View style={styles.inputWrapper}>
+            <TextInput
+              ref={inputRef}
+              style={[
+                styles.textInput,
+                { height: Math.min(Math.max(48, inputHeight), 120) }
+              ]}
+              value={input}
+              onChangeText={setInput}
+              placeholder="Digite sua mensagem..."
+              placeholderTextColor="#a0a0a0"
+              multiline
+              maxLength={500}
+              onSubmitEditing={handleSend}
+              blurOnSubmit={false}
+              returnKeyType="send"
+              onContentSizeChange={(event) => {
+                setInputHeight(event.nativeEvent.contentSize.height);
+              }}
+              onFocus={() => {
+                // Se não estiver com o teclado visível, forçamos o scroll
+                // para garantir que o input não fique escondido
+                if (!isKeyboardVisible) {
+                  setTimeout(() => {
+                    flatListRef.current?.scrollToEnd({ animated: true });
+                  }, 300);
+                } else {
+                  // Se já estiver com o teclado visível, apenas fazemos scroll
+                  flatListRef.current?.scrollToEnd({ animated: true });
+                }
+              }}
+            />
+            
+            <TouchableOpacity 
+              style={[
+                styles.sendButton,
+                !input.trim() && styles.sendButtonDisabled
+              ]}
+              onPress={handleSend} 
+              disabled={!input.trim() || isTyping}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.sendIcon}>
+                {isTyping ? '⏳' : '➤'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          
+          {input.length > 0 && (
+            <Text style={styles.characterCount}>
+              {input.length}/500
+            </Text>
+          )}
+        </Animated.View>
       </View>
-    </KeyboardAvoidingView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 8, backgroundColor: '#fff' },
-  title: { fontSize: 20, marginBottom: 8, alignSelf: 'center' },
-  inputRow: { flexDirection: 'row', alignItems: 'center', padding: 8 },
-  input: { flex: 1, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, marginRight: 8 },
-  reactionsRow: { flexDirection: 'row', alignItems: 'center', marginLeft: 8 },
-  likeBtn: { marginRight: 12, padding: 4 },
-  answered: { color: 'green', fontWeight: 'bold' },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#f8f9fa' 
+  },
+  
+  // Header Styles
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#2c3e50',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backIcon: {
+    fontSize: 20,
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  headerInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  roomTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 2,
+  },
+  onlineStatus: {
+    fontSize: 12,
+    color: '#bdc3c7',
+  },
+  menuButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuIcon: {
+    fontSize: 20,
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  // Messages Styles
+  messagesWrapper: {
+    flex: 1,
+    paddingBottom: 80, // Fixed padding for the input height
+    zIndex: 1,
+  },
+  messagesContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    flexGrow: 1,
+  },
+  messageContainer: {
+    marginVertical: 4,
+  },
+  ownMessageContainer: {
+    alignItems: 'flex-end',
+  },
+  dateSeparator: {
+    alignItems: 'center',
+    marginVertical: 12,
+  },
+  dateText: {
+    fontSize: 12,
+    color: '#6c757d',
+    backgroundColor: '#e9ecef',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    textTransform: 'capitalize',
+  },
+
+  // Reactions Styles
+  reactionsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    marginLeft: 8,
+  },
+  ownReactionsContainer: {
+    marginLeft: 0,
+    marginRight: 8,
+    justifyContent: 'flex-end',
+  },
+  reactionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginRight: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  likeButton: {
+    backgroundColor: '#e8f4fd',
+  },
+  replyButton: {
+    backgroundColor: '#f0f0f0',
+  },
+  reactionIcon: {
+    fontSize: 14,
+    marginRight: 4,
+  },
+  reactionCount: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#495057',
+  },
+  answeredBadge: {
+    backgroundColor: '#d4edda',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  answeredText: {
+    fontSize: 10,
+    color: '#155724',
+    fontWeight: '600',
+  },
+
+  // Typing Indicator
+  typingIndicator: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 80, // height of inputContainer
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#e9ecef',
+    borderTopWidth: 1,
+    borderTopColor: '#dee2e6',
+    zIndex: 5,
+  },
+  typingText: {
+    fontSize: 12,
+    color: '#6c757d',
+    fontStyle: 'italic',
+  },
+
+  // Input Styles
+  inputContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e9ecef',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 4,
+    zIndex: 10,
+    minHeight: 80, // Garantir altura mínima para evitar saltos
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    minHeight: 48,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#212529',
+    maxHeight: 120,
+    paddingVertical: 8,
+    paddingRight: 12,
+    lineHeight: 20,
+  },
+  sendButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#007bff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#dee2e6',
+  },
+  sendIcon: {
+    fontSize: 16,
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  characterCount: {
+    fontSize: 11,
+    color: '#6c757d',
+    textAlign: 'right',
+    marginTop: 4,
+  },
+
+  // Legacy styles (mantidos para compatibilidade)
+  title: { 
+    fontSize: 20, 
+    marginBottom: 8, 
+    alignSelf: 'center' 
+  },
+  inputRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    padding: 8 
+  },
+  input: { 
+    flex: 1, 
+    borderWidth: 1, 
+    borderColor: '#ccc', 
+    borderRadius: 8, 
+    padding: 10, 
+    marginRight: 8 
+  },
+  reactionsRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginLeft: 8 
+  },
+  likeBtn: { 
+    marginRight: 12, 
+    padding: 4 
+  },
+  answered: { 
+    color: 'green', 
+    fontWeight: 'bold' 
+  },
 });
