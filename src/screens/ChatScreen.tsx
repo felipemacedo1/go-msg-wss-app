@@ -29,13 +29,15 @@ import ChatHeader from '../components/ChatHeader';
 import DateSeparator from '../components/DateSeparator';
 import MessageInput from '../components/MessageInput';
 import TypingIndicator from '../components/TypingIndicator';
+import ChatMessageList from '../components/ChatMessageList';
 
 const { width } = Dimensions.get('window');
 
 export default function ChatScreen({ route, navigation }: any) {
   const { room } = route.params;
   const { messages, setMessages } = useChat();
-  const { nickname } = useAuth();
+  const { nickname: rawNickname } = useAuth();
+  const nickname = rawNickname || '';
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [onlineUsers] = useState(Math.floor(Math.random() * 15) + 3); // Mock
@@ -271,53 +273,14 @@ export default function ChatScreen({ route, navigation }: any) {
             transform: getTranslateY(keyboardHeight, 80)
           }
         ]}>
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            keyExtractor={item => item.id}
-            renderItem={({ item, index }) => {
-            const isOwnMessage = !!nickname && item.author_name === nickname;
-            const showDateSeparator = index === 0 || 
-              new Date(item.created_at).toDateString() !== 
-              new Date(messages[index - 1].created_at).toDateString();
-
-            return (
-              <View>
-                {showDateSeparator && (
-                  <DateSeparator date={new Date(item.created_at)} />
-                )}
-                
-                <View style={[
-                  styles.messageContainer,
-                  isOwnMessage && styles.ownMessageContainer
-                ]}>
-                  <MessageBubble message={item} isOwn={isOwnMessage} />
-                  <MessageReactions
-                    message={item}
-                    isOwnMessage={isOwnMessage}
-                    onLike={handleLike}
-                    onAnswer={handleAnswer}
-                  />
-                </View>
-              </View>
-            );
-          }}
-          contentContainerStyle={styles.messagesContainer}
-          showsVerticalScrollIndicator={false}
-          onContentSizeChange={() => {
-            if (messages.length > 0) {
-              flatListRef.current?.scrollToEnd({ animated: true });
-            }
-          }}
-          // Scroll automático quando o teclado estiver visível
-          onLayout={() => {
-            if (isKeyboardVisible && messages.length > 0) {
-              setTimeout(() => {
-                flatListRef.current?.scrollToEnd({ animated: true });
-              }, 100);
-            }
-          }}
-        />
+          <ChatMessageList
+            messages={messages}
+            nickname={nickname}
+            flatListRef={flatListRef as React.RefObject<any>}
+            onLike={handleLike}
+            onAnswer={handleAnswer}
+            isKeyboardVisible={isKeyboardVisible}
+          />
         </Animated.View>
 
         {/* Indicador de digitação */}
