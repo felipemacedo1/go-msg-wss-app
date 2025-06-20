@@ -28,6 +28,7 @@ import { config } from '../config/env';
 import ChatHeader from '../components/ChatHeader';
 import DateSeparator from '../components/DateSeparator';
 import MessageInput from '../components/MessageInput';
+import TypingIndicator from '../components/TypingIndicator';
 
 const { width } = Dimensions.get('window');
 
@@ -321,14 +322,7 @@ export default function ChatScreen({ route, navigation }: any) {
 
         {/* Indicador de digitação */}
         {isTyping && (
-          <Animated.View style={[
-            styles.typingIndicator,
-            {
-              transform: getTranslateY(keyboardHeight, 0)
-            }
-          ]}>
-            <Text style={styles.typingText}>Enviando mensagem...</Text>
-          </Animated.View>
+          <TypingIndicator keyboardHeight={keyboardHeight} getTranslateY={getTranslateY} />
         )}
 
         {/* Input Fixo na parte inferior */}
