@@ -22,9 +22,12 @@ import { useChat, Message } from '../context/ChatContext';
 import { getMessages, sendMessage, reactMessage, unreactMessage, answerMessage } from '../api/messages';
 import { useWebSocket } from '../hooks/useWebSocket';
 import MessageBubble from '../components/MessageBubble';
+import MessageReactions from '../components/MessageReactions';
 import { useAuth } from '../context/AuthContext';
 import { config } from '../config/env';
 import ChatHeader from '../components/ChatHeader';
+import DateSeparator from '../components/DateSeparator';
+import MessageInput from '../components/MessageInput';
 
 const { width } = Dimensions.get('window');
 
@@ -280,15 +283,7 @@ export default function ChatScreen({ route, navigation }: any) {
             return (
               <View>
                 {showDateSeparator && (
-                  <View style={styles.dateSeparator}>
-                    <Text style={styles.dateText}>
-                      {new Date(item.created_at).toLocaleDateString('pt-BR', {
-                        weekday: 'long',
-                        day: 'numeric',
-                        month: 'long'
-                      })}
-                    </Text>
-                  </View>
+                  <DateSeparator date={new Date(item.created_at)} />
                 )}
                 
                 <View style={[
@@ -296,35 +291,12 @@ export default function ChatScreen({ route, navigation }: any) {
                   isOwnMessage && styles.ownMessageContainer
                 ]}>
                   <MessageBubble message={item} isOwn={isOwnMessage} />
-                  
-                  {/* Reações Melhoradas */}
-                  <View style={[
-                    styles.reactionsContainer,
-                    isOwnMessage && styles.ownReactionsContainer
-                  ]}>
-                    <TouchableOpacity 
-                      onPress={() => handleLike(item)} 
-                      style={[styles.reactionButton, styles.likeButton]}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.reactionIcon}>👍</Text>
-                      <Text style={styles.reactionCount}>{item.reaction_count}</Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity 
-                      onPress={() => handleAnswer(item)} 
-                      style={[styles.reactionButton, styles.replyButton]}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.reactionIcon}>�</Text>
-                    </TouchableOpacity>
-                    
-                    {item.answered && (
-                      <View style={styles.answeredBadge}>
-                        <Text style={styles.answeredText}>✓ Respondida</Text>
-                      </View>
-                    )}
-                  </View>
+                  <MessageReactions
+                    message={item}
+                    isOwnMessage={isOwnMessage}
+                    onLike={handleLike}
+                    onAnswer={handleAnswer}
+                  />
                 </View>
               </View>
             );
@@ -367,59 +339,18 @@ export default function ChatScreen({ route, navigation }: any) {
             transform: getTranslateY(keyboardHeight, 0)
           }
         ]}>
-          <View style={styles.inputWrapper}>
-            <TextInput
-              ref={inputRef}
-              style={[
-                styles.textInput,
-                { height: Math.min(Math.max(48, inputHeight), 120) }
-              ]}
-              value={input}
-              onChangeText={setInput}
-              placeholder="Digite sua mensagem..."
-              placeholderTextColor="#a0a0a0"
-              multiline
-              maxLength={500}
-              onSubmitEditing={handleSend}
-              blurOnSubmit={false}
-              returnKeyType="send"
-              onContentSizeChange={(event) => {
-                setInputHeight(event.nativeEvent.contentSize.height);
-              }}
-              onFocus={() => {
-                // Se não estiver com o teclado visível, forçamos o scroll
-                // para garantir que o input não fique escondido
-                if (!isKeyboardVisible) {
-                  setTimeout(() => {
-                    flatListRef.current?.scrollToEnd({ animated: true });
-                  }, 300);
-                } else {
-                  // Se já estiver com o teclado visível, apenas fazemos scroll
-                  flatListRef.current?.scrollToEnd({ animated: true });
-                }
-              }}
-            />
-            
-            <TouchableOpacity 
-              style={[
-                styles.sendButton,
-                !input.trim() && styles.sendButtonDisabled
-              ]}
-              onPress={handleSend} 
-              disabled={!input.trim() || isTyping}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.sendIcon}>
-                {isTyping ? '⏳' : '➤'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-          
-          {input.length > 0 && (
-            <Text style={styles.characterCount}>
-              {input.length}/500
-            </Text>
-          )}
+          <MessageInput
+            input={input}
+            setInput={setInput}
+            inputRef={inputRef as React.RefObject<any>}
+            inputHeight={inputHeight}
+            setInputHeight={setInputHeight}
+            isTyping={isTyping}
+            isKeyboardVisible={isKeyboardVisible}
+            onSend={handleSend}
+            flatListRef={flatListRef}
+            insetsBottom={insets.bottom}
+          />
         </Animated.View>
       </View>
     </>
