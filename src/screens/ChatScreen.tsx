@@ -24,6 +24,7 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import MessageBubble from '../components/MessageBubble';
 import { useAuth } from '../context/AuthContext';
 import { config } from '../config/env';
+import ChatHeader from '../components/ChatHeader';
 
 const { width } = Dimensions.get('window');
 
@@ -250,29 +251,14 @@ export default function ChatScreen({ route, navigation }: any) {
   return (
     <>
       <StatusBar barStyle="light-content" backgroundColor="#2c3e50" />
-      <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={[styles.container, { paddingTop: insets.top }]}>  
         {/* Header Moderno */}
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.backIcon}>←</Text>
-          </TouchableOpacity>
-          
-          <View style={styles.headerInfo}>
-            <Text style={styles.roomTitle} numberOfLines={1}>
-              {room.theme}
-            </Text>
-            <Text style={styles.onlineStatus}>
-              {onlineUsers} pessoas online
-            </Text>
-          </View>
-          
-          <TouchableOpacity style={styles.menuButton}>
-            <Text style={styles.menuIcon}>⋯</Text>
-          </TouchableOpacity>
-        </View>
+        <ChatHeader
+          roomTitle={room.theme}
+          onlineUsers={onlineUsers}
+          onBack={() => navigation.goBack()}
+          onMenu={() => {}}
+        />
 
         {/* Lista de Mensagens com margem bottom dinâmica */}
         <Animated.View style={[
